@@ -50,7 +50,7 @@ BeeSwarm/
 - 📈 Прогресс разработки
 
 ## 🚀 Начало работы
-1. Клонируй репозиторий: `git clone https://github.com/NK086tme/BeeSwarm.git`
+1. Клонируй репозиторий: `git clone https://github.com/NK086HUB/BeeSwarm.git`
 2. Установи Git LFS: `git lfs install`
 3. Открой проект в Unity 2022.3+
 4. Начни с изучения документации в `memory/bee_swarm_project.md`
@@ -62,13 +62,11 @@ BeeSwarm/
 4. **Фаза 4:** Разведка и защита
 5. **Фаза 5:** Оптимизация и полировка
 
-## 👥 Участие в разработке
-Приветствуются предложения и помощь в разработке! Создавайте Issues для обсуждения идей и Pull Requests для внесения изменений.
 
 ## 📄 Лицензия
 MIT License - смотри файл LICENSE
 
 ## 📞 Контакты
 - **Автор:** NK086
-- **GitHub:** [NK086tme](https://github.com/NK086tme)
-- **Проект:** [BeeSwarm](https://github.com/NK086tme/BeeSwarm)
+- **GitHub:** [NK086HUB](https://github.com/NK086HUB)
+- **Проект:** [BeeSwarm](https://github.com/NK086HUB/BeeSwarm)
