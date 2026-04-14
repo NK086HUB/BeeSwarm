@@ -1,7 +1,4 @@
-# Unity .gitignore (объединённая версия)
-# Основано на: https://github.com/github/gitignore/blob/main/Unity.gitignore
-
-# Временные файлы Unity
+# Unity
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
@@ -9,14 +6,17 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
-.utmp/
 
-# Логи и отладочные файлы
-*.log
-sysinfo.txt
-mono_crash.*
+# Memory captures
+*.mprof
+*.prof
 
-# Автогенерируемые файлы IDE
+# Auto-generated Android files
+*.apk
+*.aab
+*.keystore
+
+# Auto-generated VS/MD files
 *.csproj
 *.unityproj
 *.sln
@@ -28,84 +28,25 @@ mono_crash.*
 *.booproj
 *.svd
 *.pdb
-*.mdb
 *.opendb
-*.VC.db
 
-# Метафайлы Unity
+# Unity3D generated meta files
 *.pidb.meta
 *.pdb.meta
-*.mdb.meta
 
-# Blender файлы (только backup)
-*.blend1
-*.blend1.meta
+# Unity3D Generated File On Crash Reports
+sysinfo.txt
 
-# Записи и дампы памяти
-/[Mm]emoryCaptures/
-/[Rr]ecordings/
-
-# Сборки
+# Builds
 *.apk
-*.aab
 *.unitypackage
-*.unitypackage.meta
-*.app
 
-# Crashlytics
+# Crashlytics generated file
 crashlytics-build.properties
 
-# TestRunner
-InitTestScene*.unity*
+# Packed Addressables
+[Bb]uild/[Aa]ssets/[Ll]ibrary
+[Bb]uild/[Aa]ssets/[Aa]sset[Bb]undles
 
-# Addressables
-/ServerData
-/[Aa]ssets/StreamingAssets/aa*
-/[Aa]ssets/AddressableAssetsData/link.xml*
-/[Aa]ssets/Addressables_Temp*
-/[Aa]ssets/AddressableAssetsData/*/*.bin*
-
-# Visual Scripting
-/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db
-/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db.meta
-/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers
-/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers.meta
-
-# Play mode tests
-/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
-
-# IDE файлы
-.vs/
-.gradle/
-.consulo/
-.idea/
-/[Aa]ssets/Plugins/Editor/JetBrains*
-*.DotSettings.user
-
-# Системные файлы
-.DS_Store
-Thumbs.db
-
-# Наши кастомные исключения (НЕ КОММИТИТЬ!)
-Config/local*.json
-Secrets/
-Personal/
-*_password*
-*_secret*
-*_key*
-*_token*
-
-# OpenClaw временные файлы
-.openclaw/cache/
-.openclaw/tmp/
-
-# Мониторинг данные
-prometheus_data/
-grafana/data/
-
-# Логи приложения
-logs/
-
-# Бэкапы скриптов
-*.sh.bak
-*.py.bak
+# Temporary auto-generated Android Assets
+[Bb]uild/[Aa]ssets/[Aa]sset[Bb]undles/Android
