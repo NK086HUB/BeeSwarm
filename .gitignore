@@ -98,9 +98,6 @@ memory/
 *_with_password.sh
 *_credentials.sh
 
-# Unity meta files for non-Unity projects
-*.meta
-
 # Temporary files
 *.tmp
 *.temp
@@ -108,3 +105,73 @@ memory/
 *.old
 *.swp
 *~
+
+# ============================================
+# UNITY SPECIFIC - BeeSwarm Project Only
+# ============================================
+
+# Unity generated files
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# Auto-generated files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.apk
+*.aab
+*.keystore
+
+# Crash reports
+sysinfo.txt
+crashlytics-build.properties
+
+# Packed Addressables
+[Bb]uild/[Aa]ssets/[Ll]ibrary
+[Bb]uild/[Aa]ssets/[Aa]sset[Bb]undles
+
+# VS/MD/Consulo generated
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D generated meta files
+*.pidb.meta
+*.pdb.meta
+
+# Unity3D Generated File On Crash Reports
+sysinfo.txt
+
+# Builds
+*.apk
+*.unitypackage
+
+# Visual Studio cache directory
+.vs/
