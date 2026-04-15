@@ -50,3 +50,61 @@ crashlytics-build.properties
 
 # Temporary auto-generated Android Assets
 [Bb]uild/[Aa]ssets/[Aa]sset[Bb]undles/Android
+
+# ============================================
+# PRIVATE FILES - NEVER COMMIT TO PUBLIC REPO
+# ============================================
+
+# Memory and personal data
+MEMORY.md
+TOOLS.md
+USER.md
+SOUL.md
+IDENTITY.md
+AGENTS.md
+HEARTBEAT.md
+BOOTSTRAP.md
+memory/
+*.memory.md
+*_memory.md
+
+# Configuration files with secrets
+*.config.json
+*.conf
+*.yml
+*.yaml
+.env
+.env.local
+.env.*.local
+*credentials*
+*password*
+*secret*
+*token*
+*key*
+
+# Reports with sensitive information
+*_REPORT.md
+*_report.md
+*_log_*.md
+*_diagnostic*.md
+*_status*.md
+
+# Backup and recovery files
+*_backup*
+*_recovery*
+*_restore*
+
+# Scripts with hardcoded credentials
+*_with_password.sh
+*_credentials.sh
+
+# Unity meta files for non-Unity projects
+*.meta
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+*.swp
+*~
