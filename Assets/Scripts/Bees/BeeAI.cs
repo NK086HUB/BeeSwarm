@@ -65,6 +65,7 @@ namespace BeeSwarm.Bees
         private BeeState currentState = BeeState.Idle;
         private Transform hiveTransform;
         private HiveManager hiveManager;
+        private Seasons.SeasonCycle seasonCycle;
 
         // Свойства
         public BeeState CurrentState => currentState;
@@ -79,6 +80,11 @@ namespace BeeSwarm.Bees
 
             hiveManager = HiveManager.Instance;
             hiveTransform = hiveManager?.transform;
+            seasonCycle = FindObjectOfType<Seasons.SeasonCycle>();
+
+            // Если зима — сразу в улей
+            if (seasonCycle != null && seasonCycle.IsWinterMode)
+                SetState(BeeState.Resting);
 
             ApplyProfessionStats();
         }
@@ -148,7 +154,7 @@ namespace BeeSwarm.Bees
                 return;
             }
 
-            searchTimer += Time.deltaTime;
+            searchTimer += Time.deltaTime * (seasonCycle?.GetForageMultiplier() ?? 1f);
             if (searchTimer > maxSearchTime)
             {
                 searchTimer = 0f;
