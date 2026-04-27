@@ -1,33 +1,35 @@
 # BeeSwarm — Project Status
 
-> Updated: 28.04.2026 01:05
+> Updated: 28.04.2026 01:23
 
 ## Repository
-- **URL:** https://github.com/NK086/BeeSwarm.git
+- **URL:** git@github.com:NK086HUB/BeeSwarm.git
 - **Branch:** main
-- **Last commit:** feat: bee AI, flower controller, flower manager | 58 seconds ago
+- **Last commit:** feat: season cycle, hive display, seasonal bee behavior | 6 minutes ago
 
 ## Progress
-- **Scripts:** 9
-- **Total lines:** 1930
+- **Scripts:** 11
+- **Total lines:** 2019
 
 ## Current scripts
-  - `BeeAI.cs` (456 строк)
-  - `BeeController.cs` (157 строк)
+  - `BeeAI.cs` (301 строк)
+  - `BeeController.cs` (129 строк)
+  - `BeeHiveDisplay.cs` (76 строк)
   - `GameManager.cs` (152 строк)
-  - `HiveManager.cs` (269 строк)
-  - `FlowerController.cs` (117 строк)
-  - `FlowerManager.cs` (165 строк)
+  - `HiveManager.cs` (272 строк)
+  - `FlowerController.cs` (83 строк)
+  - `FlowerManager.cs` (120 строк)
   - `ResourceSystem.cs` (280 строк)
+  - `SeasonCycle.cs` (272 строк)
   - `BeeSimple.cs` (154 строк)
   - `TestScene.cs` (180 строк)
 
 ## Roadmap
-- [x] Core: GameManager, HiveManager, BeeController
+- [x] Core: GameManager, HiveManager, BeeController, BeeHiveDisplay
 - [x] Bees: BeeAI (FSM), BeeSimple
 - [x] Environment: FlowerController, FlowerManager
 - [x] Resources: ResourceSystem (14 types)
-- [ ] Seasons: SeasonCycle system
+- [x] Seasons: SeasonCycle (4 seasons, temperature, winter mode)
 - [ ] FogOfWar: exploration and scouting
 - [ ] BeePhysics: flight dynamics, collision avoidance
 - [ ] UI: hive dashboard, resource panels
