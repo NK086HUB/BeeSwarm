@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BeeSwarm.Resources;
 
 namespace BeeSwarm.Core
 {
@@ -18,9 +19,10 @@ namespace BeeSwarm.Core
         [SerializeField] private float pollenAmount = 50f;
         [SerializeField] private float waxAmount = 30f;
         
-        [Header("Ссылки")]
+        [Header("Ссылки (2D)")]
         [SerializeField] private GameObject beePrefab;
         [SerializeField] private Transform beeSpawnPoint;
+        [SerializeField] private BoxCollider2D hiveArea;
         
         // Коллекции
         private List<BeeController> allBees = new List<BeeController>();
@@ -32,7 +34,7 @@ namespace BeeSwarm.Core
         public float HoneyAmount => honeyAmount;
         public float PollenAmount => pollenAmount;
         public float WaxAmount => waxAmount;
-        public Vector3 HiveCenter => transform.position;
+        public Vector2 HiveCenter => transform.position;
         public Transform HiveEntrance => hiveEntrance;
         
         // Синглтон
@@ -97,8 +99,8 @@ namespace BeeSwarm.Core
             BeeController bee = beePool.Dequeue();
             GameObject beeObj = bee.gameObject;
             
-            // Установить позицию
-            Vector3 spawnPos = beeSpawnPoint.position + Random.insideUnitSphere * 2f;
+            // Установить позицию (2D)
+            Vector2 spawnPos = (Vector2)beeSpawnPoint.position + Random.insideUnitCircle * 2f;
             beeObj.transform.position = spawnPos;
             beeObj.transform.rotation = Quaternion.identity;
             
@@ -131,45 +133,46 @@ namespace BeeSwarm.Core
         }
         
         /// <summary>
-        /// Получить случайную позицию внутри улья
+        /// Получить случайную позицию внутри улья (2D)
         /// </summary>
-        public Vector3 GetRandomHivePosition()
+        public Vector2 GetRandomHivePosition()
         {
-            Vector3 halfBounds = hiveBounds * 0.5f;
-            Vector3 randomOffset = new Vector3(
-                Random.Range(-halfBounds.x, halfBounds.x),
-                Random.Range(-halfBounds.y, halfBounds.y),
-                Random.Range(-halfBounds.z, halfBounds.z)
+            Vector2 offset = new Vector2(
+                Random.Range(-hiveBounds.x * 0.5f, hiveBounds.x * 0.5f),
+                Random.Range(-hiveBounds.y * 0.5f, hiveBounds.y * 0.5f)
             );
-            
-            return transform.position + randomOffset;
+            return (Vector2)transform.position + offset;
         }
         
         /// <summary>
-        /// Проверить, находится ли точка внутри улья
+        /// Проверить, находится ли точка внутри улья (2D)
         /// </summary>
-        public bool IsInsideHive(Vector3 position)
+        public bool IsInsideHive(Vector2 position)
         {
-            Vector3 localPos = transform.InverseTransformPoint(position);
-            Vector3 halfBounds = hiveBounds * 0.5f;
-            
-            return Mathf.Abs(localPos.x) <= halfBounds.x &&
-                   Mathf.Abs(localPos.y) <= halfBounds.y &&
-                   Mathf.Abs(localPos.z) <= halfBounds.z;
+            Vector2 localPos = transform.InverseTransformPoint(position);
+            return Mathf.Abs(localPos.x) <= hiveBounds.x * 0.5f &&
+                   Mathf.Abs(localPos.y) <= hiveBounds.y * 0.5f;
         }
         
         /// <summary>
-        /// Добавить ресурсы в улей
+        /// Добавить ресурсы в улей (через ResourceSystem)
         /// </summary>
         public void AddResources(float honey, float pollen, float wax)
         {
-            honeyAmount += honey;
-            pollenAmount += pollen;
-            waxAmount += wax;
-            
-            honeyAmount = Mathf.Max(0f, honeyAmount);
-            pollenAmount = Mathf.Max(0f, pollenAmount);
-            waxAmount = Mathf.Max(0f, waxAmount);
+            ResourceSystem rs = ResourceSystem.Instance;
+            if (rs != null)
+            {
+                if (honey > 0f) rs.AddResource(ResourceType.Honey, honey);
+                if (pollen > 0f) rs.AddResource(ResourceType.Pollen, pollen);
+                if (wax > 0f) rs.AddResource(ResourceType.Wax, wax);
+            }
+            else
+            {
+                // Fallback на простые числа
+                honeyAmount += honey;
+                pollenAmount += pollen;
+                waxAmount += wax;
+            }
         }
         
         /// <summary>
@@ -209,7 +212,7 @@ namespace BeeSwarm.Core
         /// <summary>
         /// Найти ближайшую пчелу к точке
         /// </summary>
-        public BeeController FindNearestBee(Vector3 position, float maxDistance = Mathf.Infinity)
+        public BeeController FindNearestBee(Vector2 position, float maxDistance = Mathf.Infinity)
         {
             BeeController nearest = null;
             float nearestDistance = maxDistance;
@@ -218,7 +221,7 @@ namespace BeeSwarm.Core
             {
                 if (!bee.gameObject.activeInHierarchy) continue;
                 
-                float distance = Vector3.Distance(bee.transform.position, position);
+                float distance = Vector2.Distance(bee.transform.position, position);
                 if (distance < nearestDistance)
                 {
                     nearest = bee;
@@ -231,15 +234,15 @@ namespace BeeSwarm.Core
         
         void OnDrawGizmosSelected()
         {
-            // Визуализация границ улья
+            // Визуализация границ улья (2D)
             Gizmos.color = new Color(1f, 0.5f, 0f, 0.3f);
-            Gizmos.DrawCube(transform.position, hiveBounds);
+            Gizmos.DrawCube(transform.position, new Vector3(hiveBounds.x, hiveBounds.y, 1f));
             
             // Вход в улей
             if (hiveEntrance != null)
             {
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawSphere(hiveEntrance.position, 0.5f);
+                Gizmos.DrawSphere(hiveEntrance.position, 0.3f);
             }
         }
         

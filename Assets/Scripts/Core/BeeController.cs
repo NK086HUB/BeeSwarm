@@ -3,7 +3,7 @@ using UnityEngine;
 namespace BeeSwarm.Core
 {
     /// <summary>
-    /// Базовый контроллер пчелы
+    /// Базовый контроллер пчелы (2D)
     /// </summary>
     public class BeeController : MonoBehaviour
     {
@@ -11,147 +11,119 @@ namespace BeeSwarm.Core
         [SerializeField] private float moveSpeed = 3f;
         [SerializeField] private float rotationSpeed = 5f;
         [SerializeField] private float maxEnergy = 100f;
-        
-        [Header("Ссылки")]
-        [SerializeField] private Rigidbody rb;
+
+        [Header("Ссылки (2D)")]
+        [SerializeField] private new Rigidbody2D rigidbody2D;
         [SerializeField] private Animator animator;
-        
+
         // Текущие значения
         private float currentEnergy;
-        private Vector3 targetPosition;
+        private Vector2 targetPosition;
         private bool hasTarget = false;
-        
+
         // Свойства
         public float CurrentEnergy => currentEnergy;
         public float EnergyPercentage => currentEnergy / maxEnergy;
         public bool IsExhausted => currentEnergy < 20f;
-        
+        public bool HasTarget => hasTarget;
+        public Vector2 TargetPosition => targetPosition;
+
         void Start()
         {
+            if (rigidbody2D == null) rigidbody2D = GetComponent<Rigidbody2D>();
             currentEnergy = maxEnergy;
-            targetPosition = transform.position;
         }
-        
+
         void Update()
         {
-            // Анимация полёта
-            UpdateAnimation();
-            
-            // Расход энергии
             if (hasTarget)
             {
-                currentEnergy -= Time.deltaTime * 0.5f; // 0.5 энергии в секунду
+                currentEnergy -= Time.deltaTime * 0.5f;
                 currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy);
             }
+            UpdateAnimation();
         }
-        
+
         void FixedUpdate()
         {
             if (hasTarget && !IsExhausted)
-            {
                 MoveToTarget();
-            }
         }
-        
-        /// <summary>
-        /// Установить цель движения
-        /// </summary>
-        public void SetTarget(Vector3 position)
+
+        public void SetTarget(Vector2 position)
         {
             targetPosition = position;
             hasTarget = true;
         }
-        
-        /// <summary>
-        /// Очистить цель движения
-        /// </summary>
+
+        public void SetTarget(Vector3 position)
+        {
+            targetPosition = (Vector2)position;
+            hasTarget = true;
+        }
+
         public void ClearTarget()
         {
             hasTarget = false;
         }
-        
-        /// <summary>
-        /// Движение к цели
-        /// </summary>
+
         private void MoveToTarget()
         {
-            Vector3 direction = (targetPosition - transform.position).normalized;
-            float distance = Vector3.Distance(transform.position, targetPosition);
-            
-            // Если близко к цели - остановиться
+            Vector2 direction = (targetPosition - (Vector2)transform.position).normalized;
+            float distance = Vector2.Distance(transform.position, targetPosition);
+
             if (distance < 0.5f)
             {
                 hasTarget = false;
                 return;
             }
-            
-            // Движение
-            Vector3 moveDirection = direction * moveSpeed * Time.fixedDeltaTime;
-            rb.MovePosition(rb.position + moveDirection);
-            
-            // Поворот
-            if (direction != Vector3.zero)
+
+            // Движение через Rigidbody2D
+            Vector2 move = direction * moveSpeed * Time.fixedDeltaTime;
+            rigidbody2D.MovePosition(rigidbody2D.position + move);
+
+            // Поворот по направлению движения (2D — flip по X)
+            if (direction.x != 0f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(direction);
-                rb.rotation = Quaternion.Slerp(rb.rotation, targetRotation, rotationSpeed * Time.fixedDeltaTime);
+                float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                rigidbody2D.MoveRotation(Mathf.LerpAngle(rigidbody2D.rotation, angle, rotationSpeed * Time.fixedDeltaTime));
+
+                // Flip спрайта если летит влево
+                Vector3 scale = transform.localScale;
+                scale.x = direction.x < 0 ? -Mathf.Abs(scale.x) : Mathf.Abs(scale.x);
+                transform.localScale = scale;
             }
         }
-        
-        /// <summary>
-        /// Обновление анимации
-        /// </summary>
+
         private void UpdateAnimation()
         {
-            if (animator != null)
-            {
-                // Скорость для анимации
-                float speed = hasTarget ? 1f : 0f;
-                animator.SetFloat("Speed", speed);
-                
-                // Энергия для анимации усталости
-                animator.SetFloat("Energy", EnergyPercentage);
-            }
+            if (animator == null) return;
+            animator.SetFloat("Speed", hasTarget ? 1f : 0f);
+            animator.SetFloat("Energy", EnergyPercentage);
         }
-        
-        /// <summary>
-        /// Восстановить энергию
-        /// </summary>
+
         public void RestoreEnergy(float amount)
         {
-            currentEnergy += amount;
-            currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy);
+            currentEnergy = Mathf.Clamp(currentEnergy + amount, 0f, maxEnergy);
         }
-        
-        /// <summary>
-        /// Потратить энергию
-        /// </summary>
+
         public void ConsumeEnergy(float amount)
         {
-            currentEnergy -= amount;
-            currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy);
+            currentEnergy = Mathf.Clamp(currentEnergy - amount, 0f, maxEnergy);
         }
-        
-        /// <summary>
-        /// Проверить, может ли пчела выполнять действия
-        /// </summary>
-        public bool CanWork()
-        {
-            return !IsExhausted && currentEnergy > 30f;
-        }
-        
+
+        public bool CanWork() => !IsExhausted && currentEnergy > 30f;
+
         void OnDrawGizmosSelected()
         {
-            // Визуализация цели в редакторе
             if (hasTarget)
             {
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawSphere(targetPosition, 0.3f);
                 Gizmos.DrawLine(transform.position, targetPosition);
             }
-            
-            // Визуализация энергии
             Gizmos.color = Color.Lerp(Color.red, Color.green, EnergyPercentage);
-            Gizmos.DrawWireSphere(transform.position, 1f);
+            Gizmos.DrawWireSphere(transform.position, 0.5f);
         }
     }
 }
