@@ -9,7 +9,7 @@ namespace BeeSwarm.Core
     public class HiveManager : MonoBehaviour
     {
         [Header("Настройки улья")]
-        [SerializeField] private int maxBees = 500;
+        [SerializeField] private int maxBees = 50;
         [SerializeField] private Transform hiveEntrance;
         [SerializeField] private Vector3 hiveBounds = new Vector3(10f, 5f, 10f);
         
@@ -61,14 +61,24 @@ namespace BeeSwarm.Core
         /// </summary>
         private void InitializeBeePool()
         {
-            for (int i = 0; i < maxBees; i++)
+            // Start with small pool, grow on demand
+            for (int i = 0; i < 10; i++)
             {
-                GameObject beeObj = Instantiate(beePrefab, beeSpawnPoint.position, Quaternion.identity);
-                BeeController bee = beeObj.GetComponent<BeeController>();
-                
-                beeObj.SetActive(false);
-                beePool.Enqueue(bee);
+                CreatePoolBee();
             }
+        }
+
+        private void CreatePoolBee()
+        {
+            GameObject beeObj;
+            if (beePrefab != null)
+                beeObj = Instantiate(beePrefab, beeSpawnPoint.position, Quaternion.identity);
+            else
+                beeObj = CreateDefaultBee();
+
+            BeeController bee = beeObj.GetComponent<BeeController>();
+            beeObj.SetActive(false);
+            beePool.Enqueue(bee);
         }
         
         /// <summary>
@@ -87,14 +97,18 @@ namespace BeeSwarm.Core
         /// </summary>
         public BeeController SpawnBee()
         {
+            // Взять пчелу из пула или создать новую
+            BeeController bee;
             if (beePool.Count == 0)
             {
-                Debug.LogWarning("Достигнут лимит пчёл!");
-                return null;
+                if (allBees.Count >= maxBees)
+                {
+                    Debug.LogWarning("Достигнут лимит пчёл!");
+                    return null;
+                }
+                CreatePoolBee();
             }
-            
-            // Взять пчелу из пула
-            BeeController bee = beePool.Dequeue();
+            bee = beePool.Dequeue();
             GameObject beeObj = bee.gameObject;
             
             // Установить позицию
@@ -241,6 +255,40 @@ namespace BeeSwarm.Core
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawSphere(hiveEntrance.position, 0.5f);
             }
+        }
+        
+        GameObject CreateDefaultBee()
+        {
+            // Create a lightweight bee with proper visuals
+            GameObject beeObj = new GameObject("Bee");
+            beeObj.transform.localScale = Vector3.one * 0.3f;
+            
+            // Body (sphere)
+            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            body.name = "Body";
+            body.transform.SetParent(beeObj.transform);
+            body.transform.localPosition = Vector3.zero;
+            Object.DestroyImmediate(body.GetComponent<Collider>());
+            var r = body.GetComponent<MeshRenderer>();
+            if (r != null) { r.material = new Material(Shader.Find("Standard")); r.material.color = Color.yellow; }
+            
+            // Wings
+            for (int i = -1; i <= 1; i += 2)
+            {
+                GameObject wing = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                wing.name = i < 0 ? "Wing_L" : "Wing_R";
+                wing.transform.SetParent(beeObj.transform);
+                wing.transform.localPosition = new Vector3(i * 0.3f, 0.15f, 0f);
+                wing.transform.localScale = new Vector3(0.15f, 0.05f, 0.3f);
+                Object.DestroyImmediate(wing.GetComponent<Collider>());
+            }
+            
+            beeObj.AddComponent<Rigidbody>();
+            beeObj.AddComponent<BeeController>();
+            beeObj.AddComponent<BeeMemory>();
+            beeObj.transform.position = beeSpawnPoint.position;
+            beeObj.name = "DefaultBee";
+            return beeObj;
         }
         
         void OnGUI()
