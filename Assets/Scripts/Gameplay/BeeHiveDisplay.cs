@@ -4,52 +4,43 @@ using BeeSwarm.Core;
 namespace BeeSwarm.Gameplay
 {
     /// <summary>
-    /// Визуальное представление улья на сцене.
-    /// Показывает мёд, сезонный цвет, состояние.
+    /// 2D визуальное представление улья на сцене
     /// </summary>
     public class BeeHiveDisplay : MonoBehaviour
     {
-        [Header("Визуал")]
-        [SerializeField] private Color summerColor = new Color(0.8f, 0.5f, 0.2f);
+        [Header("Спрайты")]
+        [SerializeField] private Color hiveColor = new Color(0.7f, 0.4f, 0.15f);
         [SerializeField] private Color winterColor = new Color(0.6f, 0.6f, 0.8f);
-        [SerializeField] private float scalePerBee = 0.02f;
-        [SerializeField] private float baseScale = 1.5f;
+        [SerializeField] private float baseScale = 2f;
+        [SerializeField] private float scalePerBee = 0.03f;
 
         [Header("Ссылки")]
         [SerializeField] private HiveManager hiveManager;
         [SerializeField] private SeasonCycle seasonCycle;
         [SerializeField] private Transform visualRoot;
 
-        private MeshRenderer hiveRenderer;
-        private SeasonCycle.Season lastSeason;
+        private SpriteRenderer hiveRenderer;
+        private SpriteRenderer entranceRenderer;
 
         void Start()
         {
-            if (hiveManager == null)
-                hiveManager = FindObjectOfType<HiveManager>();
-            if (seasonCycle == null)
-                seasonCycle = FindObjectOfType<SeasonCycle>();
-            if (visualRoot == null)
-                visualRoot = transform;
+            if (hiveManager == null) hiveManager = FindObjectOfType<HiveManager>();
+            if (seasonCycle == null) seasonCycle = FindObjectOfType<SeasonCycle>();
+            if (visualRoot == null) visualRoot = transform;
 
-            // Создаём визуал улья если нет
-            if (visualRoot.childCount == 0)
-                CreateHiveVisual();
+            if (visualRoot.childCount == 0) CreateHiveVisual();
 
-            hiveRenderer = GetComponentInChildren<MeshRenderer>();
+            hiveRenderer = visualRoot.GetComponentInChildren<SpriteRenderer>();
 
             if (seasonCycle != null)
             {
                 seasonCycle.OnSeasonChanged += OnSeasonChange;
                 OnSeasonChange(seasonCycle.CurrentSeason);
             }
-
-            lastSeason = seasonCycle != null ? seasonCycle.CurrentSeason : SeasonCycle.Season.Spring;
         }
 
         void Update()
         {
-            // Обновляем размер улья по количеству пчёл
             if (hiveManager != null)
             {
                 float scale = baseScale + hiveManager.BeeCount * scalePerBee;
@@ -60,89 +51,73 @@ namespace BeeSwarm.Gameplay
 
         void CreateHiveVisual()
         {
-            // Создаём тело улья (сфера/капля)
-            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            // Hive body
+            GameObject body = new GameObject("HiveBody");
             body.transform.SetParent(visualRoot);
-            body.transform.localPosition = new Vector3(0f, 1.5f, 0f);
-            body.transform.localScale = new Vector3(2f, 1.8f, 2f);
-            body.name = "HiveBody";
+            body.transform.localPosition = Vector3.zero;
 
-            // Убираем коллайдер (улей статичный, коллайдер у HiveManager)
-            DestroyImmediate(body.GetComponent<Collider>());
+            var sr = body.AddComponent<SpriteRenderer>();
+            sr.sprite = CreateCircleSprite(32, hiveColor);
+            sr.sortingOrder = 0;
+            sr.transform.localScale = new Vector3(2f, 1.8f, 1f);
+            hiveRenderer = sr;
 
-            hiveRenderer = body.GetComponent<MeshRenderer>();
-            if (hiveRenderer != null)
-            {
-                hiveRenderer.material = new Material(Shader.Find("Standard"));
-                hiveRenderer.material.color = summerColor;
-            }
-
-            // Создаём вход в улей (маленькая сфера)
-            GameObject entrance = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            // Entrance (smaller dark circle)
+            GameObject entrance = new GameObject("Entrance");
             entrance.transform.SetParent(visualRoot);
-            entrance.transform.localPosition = new Vector3(1.2f, 0.5f, 0f);
-            entrance.transform.localScale = new Vector3(0.4f, 0.3f, 0.4f);
-            entrance.name = "Entrance";
-            DestroyImmediate(entrance.GetComponent<Collider>());
-            var eRenderer = entrance.GetComponent<MeshRenderer>();
-            if (eRenderer != null)
-            {
-                eRenderer.material = new Material(Shader.Find("Standard"));
-                eRenderer.material.color = new Color(0.2f, 0.15f, 0.1f);
-            }
+            entrance.transform.localPosition = new Vector3(1f, -0.3f, 0f);
+
+            var esr = entrance.AddComponent<SpriteRenderer>();
+            esr.sprite = CreateCircleSprite(8, new Color(0.2f, 0.15f, 0.1f));
+            esr.sortingOrder = 1;
+            entrance.transform.localScale = new Vector3(0.4f, 0.3f, 1f);
+        }
+
+        Sprite CreateCircleSprite(int resolution, Color color)
+        {
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            float center = resolution / 2f;
+            float radius = center - 1f;
+            for (int y = 0; y < resolution; y++)
+                for (int x = 0; x < resolution; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                    tex.SetPixel(x, y, dist <= radius ? color : Color.clear);
+                }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 16f);
         }
 
         void OnSeasonChange(SeasonCycle.Season season)
         {
             if (hiveRenderer == null) return;
-
-            // Меняем цвет улья по сезону
-            Color targetColor;
-            switch (season)
+            Color target = season switch
             {
-                case SeasonCycle.Season.Spring:
-                    targetColor = Color.Lerp(summerColor, Color.white, 0.2f);
-                    break;
-                case SeasonCycle.Season.Summer:
-                    targetColor = summerColor;
-                    break;
-                case SeasonCycle.Season.Autumn:
-                    targetColor = Color.Lerp(summerColor, new Color(0.3f, 0.2f, 0.1f), 0.5f);
-                    break;
-                case SeasonCycle.Season.Winter:
-                    targetColor = winterColor;
-                    break;
-                default:
-                    targetColor = summerColor;
-                    break;
-            }
-
-            StartCoroutine(LerpColor(targetColor, 1f));
+                SeasonCycle.Season.Spring => Color.Lerp(hiveColor, Color.white, 0.2f),
+                SeasonCycle.Season.Summer => hiveColor,
+                SeasonCycle.Season.Autumn => Color.Lerp(hiveColor, new Color(0.3f, 0.2f, 0.1f), 0.5f),
+                SeasonCycle.Season.Winter => winterColor,
+                _ => hiveColor
+            };
+            StartCoroutine(LerpColor(target, 1f));
         }
 
         System.Collections.IEnumerator LerpColor(Color target, float duration)
         {
-            Color start = hiveRenderer.material.color;
+            Color start = hiveRenderer.color;
             float t = 0f;
-            while (t < duration)
-            {
-                t += Time.deltaTime;
-                hiveRenderer.material.color = Color.Lerp(start, target, t / duration);
-                yield return null;
-            }
-            hiveRenderer.material.color = target;
+            while (t < duration) { t += Time.deltaTime; hiveRenderer.color = Color.Lerp(start, target, t / duration); yield return null; }
+            hiveRenderer.color = target;
         }
 
         void OnDestroy()
         {
-            if (seasonCycle != null)
-                seasonCycle.OnSeasonChanged -= OnSeasonChange;
+            if (seasonCycle != null) seasonCycle.OnSeasonChanged -= OnSeasonChange;
         }
 
         void OnGUI()
         {
             if (hiveManager == null) return;
-
             GUILayout.BeginArea(new Rect(Screen.width / 2 - 100, Screen.height - 60, 200, 50));
             GUILayout.Label($"🏠 Улей | Пчёл: {hiveManager.ActiveBeeCount}/{hiveManager.BeeCount}");
             GUILayout.Label($"🍯 {hiveManager.HoneyAmount:F0} | 🌾 {hiveManager.PollenAmount:F0} | 🕯 {hiveManager.WaxAmount:F0}");

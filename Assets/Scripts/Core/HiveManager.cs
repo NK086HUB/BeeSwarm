@@ -259,36 +259,42 @@ namespace BeeSwarm.Core
         
         GameObject CreateDefaultBee()
         {
-            // Create a lightweight bee with proper visuals
+            // 2D bee with sprite
             GameObject beeObj = new GameObject("Bee");
-            beeObj.transform.localScale = Vector3.one * 0.3f;
+            beeObj.transform.localScale = Vector3.one * 0.5f;
             
-            // Body (sphere)
-            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            body.name = "Body";
-            body.transform.SetParent(beeObj.transform);
-            body.transform.localPosition = Vector3.zero;
-            Object.DestroyImmediate(body.GetComponent<Collider>());
-            var r = body.GetComponent<MeshRenderer>();
-            if (r != null) { r.material = new Material(Shader.Find("Standard")); r.material.color = Color.yellow; }
+            // Add sprite renderer with a simple yellow circle texture
+            var sr = beeObj.AddComponent<SpriteRenderer>();
+            sr.sprite = CreateCircleSprite(16, Color.yellow);
+            sr.sortingOrder = 1;
             
-            // Wings
-            for (int i = -1; i <= 1; i += 2)
-            {
-                GameObject wing = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                wing.name = i < 0 ? "Wing_L" : "Wing_R";
-                wing.transform.SetParent(beeObj.transform);
-                wing.transform.localPosition = new Vector3(i * 0.3f, 0.15f, 0f);
-                wing.transform.localScale = new Vector3(0.15f, 0.05f, 0.3f);
-                Object.DestroyImmediate(wing.GetComponent<Collider>());
-            }
+            // Rigidbody2D
+            var rb2d = beeObj.AddComponent<Rigidbody2D>();
+            rb2d.gravityScale = 0f;
+            rb2d.linearDamping = 0.5f;
             
-            beeObj.AddComponent<Rigidbody>();
             beeObj.AddComponent<BeeController>();
             beeObj.AddComponent<BeeMemory>();
             beeObj.transform.position = beeSpawnPoint.position;
             beeObj.name = "DefaultBee";
             return beeObj;
+        }
+        
+        private Sprite CreateCircleSprite(int resolution, Color color)
+        {
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            float center = resolution / 2f;
+            float radius = center - 1f;
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                    tex.SetPixel(x, y, dist <= radius ? color : Color.clear);
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 16f);
         }
         
         void OnGUI()

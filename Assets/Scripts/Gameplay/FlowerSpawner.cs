@@ -2,18 +2,13 @@ using UnityEngine;
 
 namespace BeeSwarm.Gameplay
 {
-    /// <summary>
-    /// Спавн цветов на сцене с учётом сезона и плотности.
-    /// Каждый цветок — источник нектара для пчёл.
-    /// </summary>
     public class FlowerSpawner : MonoBehaviour
     {
         [System.Serializable]
-        public class FlowerPrefabSet
+        public class FlowerColorSet
         {
-            public GameObject flowerPrefab;
-            public float spawnWeight = 1f;
             public Color flowerColor = Color.white;
+            public float spawnWeight = 1f;
         }
 
         [Header("Параметры спавна")]
@@ -22,8 +17,8 @@ namespace BeeSwarm.Gameplay
         [SerializeField] private float nectarPerFlower = 10f;
         [SerializeField] private float respawnDelay = 15f;
 
-        [Header("Префабы цветов")]
-        [SerializeField] private FlowerPrefabSet[] flowerTypes;
+        [Header("Цвета цветов")]
+        [SerializeField] private FlowerColorSet[] flowerColors;
 
         [Header("Ссылки")]
         [SerializeField] private SeasonCycle seasonCycle;
@@ -33,31 +28,20 @@ namespace BeeSwarm.Gameplay
 
         void Start()
         {
-            if (seasonCycle == null)
-                seasonCycle = FindObjectOfType<SeasonCycle>();
-
-            if (flowerTypes == null || flowerTypes.Length == 0)
-            {
-                // Создаём заглушку, если нет префабов
-                flowerTypes = new FlowerPrefabSet[] {
-                    new FlowerPrefabSet { flowerPrefab = null, spawnWeight = 1f, flowerColor = new Color(1f, 0.8f, 0f) }
-                };
-            }
-
+            if (seasonCycle == null) seasonCycle = FindObjectOfType<SeasonCycle>();
+            if (flowerColors == null || flowerColors.Length == 0)
+                flowerColors = new FlowerColorSet[] { new FlowerColorSet { flowerColor = Color.yellow, spawnWeight = 1f } };
             SpawnInitialFlowers();
         }
 
         void Update()
         {
-            // Респавн по таймеру
             respawnTimer += Time.deltaTime;
             if (respawnTimer >= respawnDelay)
             {
                 respawnTimer = 0f;
                 if (currentFlowerCount < GetTargetFlowerCount())
-                {
-                    RespawnFlower();
-                }
+                { SpawnFlower(); currentFlowerCount++; }
             }
         }
 
@@ -70,10 +54,7 @@ namespace BeeSwarm.Gameplay
         void SpawnInitialFlowers()
         {
             int count = Mathf.RoundToInt(GetTargetFlowerCount());
-            for (int i = 0; i < count; i++)
-            {
-                SpawnFlower();
-            }
+            for (int i = 0; i < count; i++) SpawnFlower();
             currentFlowerCount = count;
             Debug.Log($"🌸 Посажено {count} цветов");
         }
@@ -81,76 +62,51 @@ namespace BeeSwarm.Gameplay
         void SpawnFlower()
         {
             Vector3 pos = GetRandomPosition();
+            var type = flowerColors[Random.Range(0, flowerColors.Length)];
 
-            if (flowerTypes[0].flowerPrefab != null)
-            {
-                var type = flowerTypes[Random.Range(0, flowerTypes.Length)];
-                GameObject flower = Instantiate(type.flowerPrefab, pos, Quaternion.identity, transform);
-                flower.name = $"Flower_{Random.Range(1000, 9999)}";
+            GameObject flower = new GameObject($"Flower_{pos.x:F0}_{pos.y:F0}");
+            flower.transform.position = pos;
+            flower.transform.SetParent(transform);
 
-                var flowerComp = flower.GetComponent<Flower>();
-                if (flowerComp == null) flowerComp = flower.AddComponent<Flower>();
-                flowerComp.Initialize(nectarPerFlower, pos);
-            }
-            else
-            {
-                // Заглушка — создаём спрайтовый цветок без префаба
-                GameObject placeholder = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                placeholder.transform.position = pos;
-                placeholder.transform.localScale = Vector3.one * 0.6f;
-                placeholder.transform.SetParent(transform);
+            var sr = flower.AddComponent<SpriteRenderer>();
+            sr.sprite = CreateFlowerSprite(8, type.flowerColor);
+            sr.sortingOrder = 2;
 
-                // Убираем коллайдер, ставим жёлтый/розовый цвет
-                DestroyImmediate(placeholder.GetComponent<Collider>());
-
-                var renderer = placeholder.GetComponent<MeshRenderer>();
-                var type = flowerTypes[Random.Range(0, flowerTypes.Length)];
-                renderer.material.color = type.flowerColor;
-
-                var flowerComp = placeholder.AddComponent<Flower>();
-                flowerComp.Initialize(nectarPerFlower, pos);
-
-                placeholder.name = $"Flower_{pos.x:F0}_{pos.z:F0}";
-
-                // Добавляем стебель (цилиндр)
-                GameObject stem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                stem.transform.position = pos + Vector3.down * 1f;
-                stem.transform.localScale = new Vector3(0.1f, 1f, 0.1f);
-                stem.transform.SetParent(placeholder.transform);
-                DestroyImmediate(stem.GetComponent<Collider>());
-                stem.GetComponent<MeshRenderer>().material.color = Color.green;
-                stem.name = "Stem";
-            }
+            var flowerComp = flower.AddComponent<Flower>();
+            flowerComp.Initialize(nectarPerFlower, pos);
         }
 
-        void RespawnFlower()
+        Sprite CreateFlowerSprite(int resolution, Color color)
         {
-            SpawnFlower();
-            currentFlowerCount++;
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            float center = resolution / 2f;
+            float radius = center - 1f;
+            for (int y = 0; y < resolution; y++)
+                for (int x = 0; x < resolution; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                    tex.SetPixel(x, y, d <= radius ? color : Color.clear);
+                }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 16f);
         }
 
         Vector3 GetRandomPosition()
         {
             float x = Random.Range(-spawnArea.x / 2f, spawnArea.x / 2f);
-            float z = Random.Range(-spawnArea.y / 2f, spawnArea.y / 2f);
-            return new Vector3(x, 0f, z);
+            float y = Random.Range(-spawnArea.y / 2f, spawnArea.y / 2f);
+            return new Vector3(x, y, 0f);
         }
 
-        public void OnFlowerDepleted()
-        {
-            currentFlowerCount--;
-        }
+        public void OnFlowerDepleted() { currentFlowerCount--; }
 
         void OnDrawGizmosSelected()
         {
             Gizmos.color = Color.yellow;
-            Gizmos.DrawWireCube(transform.position, new Vector3(spawnArea.x, 0.5f, spawnArea.y));
+            Gizmos.DrawWireCube(transform.position, new Vector3(spawnArea.x, spawnArea.y, 0f));
         }
     }
 
-    /// <summary>
-    /// Отдельный цветок с нектаром
-    /// </summary>
     public class Flower : MonoBehaviour
     {
         [SerializeField] private float nectarAmount = 10f;
@@ -158,34 +114,25 @@ namespace BeeSwarm.Gameplay
         [SerializeField] private bool isDepleted = false;
 
         private Vector3 originalPosition;
-        private Quaternion originalRotation;
         private float regrowTimer;
         private FlowerSpawner spawner;
-        private MeshRenderer meshRenderer;
+        private SpriteRenderer spriteRenderer;
         private Color originalColor;
 
         public float NectarAmount => nectarAmount;
         public bool IsDepleted => isDepleted;
         public Vector3 Position => transform.position;
 
-        void Awake()
-        {
-            meshRenderer = GetComponent<MeshRenderer>();
-        }
+        void Awake() { spriteRenderer = GetComponent<SpriteRenderer>(); }
 
         public void Initialize(float nectar, Vector3 pos)
         {
             nectarAmount = nectar;
             originalPosition = pos;
-            originalRotation = transform.rotation;
             isDepleted = false;
             regrowTimer = 0f;
-
-            spawner = GetComponentInParent<FlowerSpawner>();
-            if (spawner == null) spawner = FindObjectOfType<FlowerSpawner>();
-
-            if (meshRenderer != null)
-                originalColor = meshRenderer.material.color;
+            spawner = GetComponentInParent<FlowerSpawner>() ?? FindObjectOfType<FlowerSpawner>();
+            if (spriteRenderer != null) originalColor = spriteRenderer.color;
         }
 
         void Update()
@@ -193,33 +140,17 @@ namespace BeeSwarm.Gameplay
             if (isDepleted)
             {
                 regrowTimer += Time.deltaTime;
-                if (regrowTimer >= regrowTime)
-                {
-                    Regrow();
-                }
+                if (regrowTimer >= regrowTime) Regrow();
             }
         }
 
-        /// <summary>Собрать нектар. Возвращает сколько собрано.</summary>
         public float Collect(float amount)
         {
             float collected = Mathf.Min(amount, nectarAmount);
             nectarAmount -= collected;
-
-            if (nectarAmount <= 0f)
-            {
-                Deplete();
-            }
-            else
-            {
-                // Визуальный фидбек — бледнеет
-                if (meshRenderer != null)
-                {
-                    float t = nectarAmount / 10f;
-                    meshRenderer.material.color = Color.Lerp(Color.gray, originalColor, t);
-                }
-            }
-
+            if (nectarAmount <= 0f) Deplete();
+            else if (spriteRenderer != null)
+                spriteRenderer.color = Color.Lerp(Color.gray, originalColor, nectarAmount / 10f);
             return collected;
         }
 
@@ -227,8 +158,6 @@ namespace BeeSwarm.Gameplay
         {
             isDepleted = true;
             nectarAmount = 0f;
-
-            // Прячем цветок
             transform.localScale = Vector3.zero;
             spawner?.OnFlowerDepleted();
         }
@@ -237,22 +166,8 @@ namespace BeeSwarm.Gameplay
         {
             isDepleted = false;
             nectarAmount = 10f;
-            transform.localScale = Vector3.one * 0.6f;
-
-            if (meshRenderer != null)
-                meshRenderer.material.color = originalColor;
-        }
-
-        void OnDrawGizmosSelected()
-        {
-            Gizmos.color = isDepleted ? Color.gray : Color.yellow;
-            Gizmos.DrawWireSphere(transform.position, 0.5f);
-
-            if (!isDepleted)
-            {
-                Gizmos.color = Color.Lerp(Color.red, Color.green, nectarAmount / 10f);
-                Gizmos.DrawRay(transform.position, Vector3.up * nectarAmount * 0.1f);
-            }
+            transform.localScale = Vector3.one;
+            if (spriteRenderer != null) spriteRenderer.color = originalColor;
         }
     }
 }
