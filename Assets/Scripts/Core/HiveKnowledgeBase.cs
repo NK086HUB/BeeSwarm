@@ -18,6 +18,7 @@ namespace BeeSwarm.Core
         [SerializeField] private int maxFlowerRecords = 100;
         [SerializeField] private int maxDangerRecords = 50;
         [SerializeField] private float knowledgeDecayTime = 300f; // 5 минут — полное устаревание
+        private static float currentDecayTime = 300f;
         [SerializeField] private float mergeRadius = 3f;          // радиус слияния записей
         [SerializeField] private bool debugLog = false;
 
@@ -43,7 +44,7 @@ namespace BeeSwarm.Core
             public string reportedBy;        // для отладки
 
             public float Score => nectarYield * confidence;
-            public bool IsFresh => Time.time - lastReportedTime < knowledgeDecayTime;
+            public bool IsFresh => Time.time - lastReportedTime < currentDecayTime;
         }
 
         /// <summary>
@@ -59,11 +60,12 @@ namespace BeeSwarm.Core
             public float lastReportedTime;
             public string dangerType;
 
-            public bool IsFresh => Time.time - lastReportedTime < knowledgeDecayTime;
+            public bool IsFresh => Time.time - lastReportedTime < currentDecayTime;
         }
 
         void Update()
         {
+            currentDecayTime = knowledgeDecayTime;
             // Периодическая очистка устаревших знаний
             CleanupOldKnowledge();
         }

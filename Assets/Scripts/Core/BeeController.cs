@@ -64,7 +64,7 @@ namespace BeeSwarm.Core
         {
             currentEnergy = maxEnergy;
             targetPosition = transform.position;
-            state = BeeState.Exploration;
+            state = BeeState.Exploring;
         }
 
         void Update()
@@ -120,7 +120,7 @@ namespace BeeSwarm.Core
                     ChooseNextAction();
                     break;
 
-                case BeeState.Exploration:
+                case BeeState.Exploring:
                     // Исследуем — ищем новые цветы
                     if (!hasTarget)
                     {
@@ -261,7 +261,7 @@ namespace BeeSwarm.Core
 
             targetPosition = target;
             hasTarget = true;
-            state = BeeState.Exploration;
+            state = BeeState.Exploring;
         }
 
         /// <summary>
@@ -463,7 +463,7 @@ namespace BeeSwarm.Core
             {
                 Color stateColor = state switch
                 {
-                    BeeState.Exploration => Color.cyan,
+                    BeeState.Exploring => Color.cyan,
                     BeeState.Foraging => Color.yellow,
                     BeeState.Returning => Color.green,
                     BeeState.Avoiding => Color.red,
