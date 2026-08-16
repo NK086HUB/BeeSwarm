@@ -11,7 +11,7 @@ namespace BeeSwarm.Core
         [Header("Настройки улья")]
         [SerializeField] private int maxBees = 50;
         [SerializeField] private Transform hiveEntrance;
-        [SerializeField] private Vector3 hiveBounds = new Vector3(10f, 5f, 10f);
+        [SerializeField] private Vector2 hiveBounds = new Vector2(10f, 5f);
         
         [Header("Ресурсы")]
         [SerializeField] private float honeyAmount = 100f;
@@ -112,7 +112,7 @@ namespace BeeSwarm.Core
             GameObject beeObj = bee.gameObject;
             
             // Установить позицию
-            Vector3 spawnPos = beeSpawnPoint.position + Random.insideUnitSphere * 2f;
+            Vector3 spawnPos = beeSpawnPoint.position + (Vector3)(Random.insideUnitCircle * 2f);
             beeObj.transform.position = spawnPos;
             beeObj.transform.rotation = Quaternion.identity;
             
@@ -147,29 +147,27 @@ namespace BeeSwarm.Core
         /// <summary>
         /// Получить случайную позицию внутри улья
         /// </summary>
-        public Vector3 GetRandomHivePosition()
+        public Vector2 GetRandomHivePosition()
         {
-            Vector3 halfBounds = hiveBounds * 0.5f;
-            Vector3 randomOffset = new Vector3(
+            Vector2 halfBounds = hiveBounds * 0.5f;
+            Vector2 randomOffset = new Vector2(
                 Random.Range(-halfBounds.x, halfBounds.x),
-                Random.Range(-halfBounds.y, halfBounds.y),
-                Random.Range(-halfBounds.z, halfBounds.z)
+                Random.Range(-halfBounds.y, halfBounds.y)
             );
             
-            return transform.position + randomOffset;
+            return (Vector2)transform.position + randomOffset;
         }
         
         /// <summary>
         /// Проверить, находится ли точка внутри улья
         /// </summary>
-        public bool IsInsideHive(Vector3 position)
+        public bool IsInsideHive(Vector2 position)
         {
-            Vector3 localPos = transform.InverseTransformPoint(position);
-            Vector3 halfBounds = hiveBounds * 0.5f;
+            Vector2 localPos = (Vector2)transform.InverseTransformPoint(position);
+            Vector2 halfBounds = hiveBounds * 0.5f;
             
             return Mathf.Abs(localPos.x) <= halfBounds.x &&
-                   Mathf.Abs(localPos.y) <= halfBounds.y &&
-                   Mathf.Abs(localPos.z) <= halfBounds.z;
+                   Mathf.Abs(localPos.y) <= halfBounds.y;
         }
         
         /// <summary>
