@@ -18,7 +18,6 @@ namespace BeeSwarm.Core
         [SerializeField] private int maxFlowerRecords = 100;
         [SerializeField] private int maxDangerRecords = 50;
         [SerializeField] private float knowledgeDecayTime = 300f; // 5 минут — полное устаревание
-        private static float currentDecayTime = 300f;
         [SerializeField] private float mergeRadius = 3f;          // радиус слияния записей
         [SerializeField] private bool debugLog = false;
 
@@ -44,7 +43,7 @@ namespace BeeSwarm.Core
             public string reportedBy;        // для отладки
 
             public float Score => nectarYield * confidence;
-            public bool IsFresh => Time.time - lastReportedTime < currentDecayTime;
+            public bool IsFresh(float decayTime) => Time.time - lastReportedTime < decayTime;
         }
 
         /// <summary>
@@ -60,12 +59,11 @@ namespace BeeSwarm.Core
             public float lastReportedTime;
             public string dangerType;
 
-            public bool IsFresh => Time.time - lastReportedTime < currentDecayTime;
+            public bool IsFresh(float decayTime) => Time.time - lastReportedTime < decayTime;
         }
 
         void Update()
         {
-            currentDecayTime = knowledgeDecayTime;
             // Периодическая очистка устаревших знаний
             CleanupOldKnowledge();
         }
@@ -200,7 +198,7 @@ namespace BeeSwarm.Core
         public HiveFlowerRecord GetBestFlower(Vector3 fromPosition)
         {
             return knownFlowers
-                .Where(r => r.IsFresh && r.nectarYield > 0.1f)
+                .Where(r => r.IsFresh(knowledgeDecayTime) && r.nectarYield > 0.1f)
                 .OrderByDescending(r =>
                 {
                     float dist = Vector3.Distance(fromPosition, r.position);
@@ -215,7 +213,7 @@ namespace BeeSwarm.Core
         public List<HiveFlowerRecord> GetBestFlowers(Vector3 fromPosition, int count = 3)
         {
             return knownFlowers
-                .Where(r => r.IsFresh && r.nectarYield > 0.1f)
+                .Where(r => r.IsFresh(knowledgeDecayTime) && r.nectarYield > 0.1f)
                 .OrderByDescending(r =>
                 {
                     float dist = Vector3.Distance(fromPosition, r.position);
@@ -231,7 +229,7 @@ namespace BeeSwarm.Core
         public bool IsPositionDangerous(Vector3 position, float checkRadius = 5f)
         {
             return knownDangers.Any(r =>
-                r.IsFresh &&
+                r.IsFresh(knowledgeDecayTime) &&
                 r.threatLevel > 0.3f &&
                 r.confidence > 0.3f &&
                 Vector3.Distance(r.position, position) < checkRadius);
@@ -242,7 +240,7 @@ namespace BeeSwarm.Core
         /// </summary>
         public List<HiveFlowerRecord> GetAllKnownFlowers()
         {
-            return knownFlowers.Where(r => r.IsFresh).ToList();
+            return knownFlowers.Where(r => r.IsFresh(knowledgeDecayTime)).ToList();
         }
 
         /// <summary>
@@ -250,7 +248,7 @@ namespace BeeSwarm.Core
         /// </summary>
         public List<HiveDangerRecord> GetAllKnownDangers()
         {
-            return knownDangers.Where(r => r.IsFresh).ToList();
+            return knownDangers.Where(r => r.IsFresh(knowledgeDecayTime)).ToList();
         }
 
         // ======================== ОЧИСТКА ========================
@@ -267,8 +265,8 @@ namespace BeeSwarm.Core
 
             int before = knownFlowers.Count + knownDangers.Count;
 
-            knownFlowers.RemoveAll(r => !r.IsFresh);
-            knownDangers.RemoveAll(r => !r.IsFresh);
+            knownFlowers.RemoveAll(r => !r.IsFresh(knowledgeDecayTime));
+            knownDangers.RemoveAll(r => !r.IsFresh(knowledgeDecayTime));
 
             int removed = before - (knownFlowers.Count + knownDangers.Count);
             if (removed > 0 && debugLog)
@@ -299,7 +297,7 @@ namespace BeeSwarm.Core
             // Цветы
             foreach (var r in knownFlowers)
             {
-                if (!r.IsFresh) continue;
+                if (!r.IsFresh(knowledgeDecayTime)) continue;
                 Gizmos.color = Color.Lerp(Color.gray, Color.green, r.confidence);
                 Gizmos.DrawSphere(r.position, 0.25f + r.nectarYield * 0.1f);
 
@@ -315,7 +313,7 @@ namespace BeeSwarm.Core
             // Опасности
             foreach (var r in knownDangers)
             {
-                if (!r.IsFresh) continue;
+                if (!r.IsFresh(knowledgeDecayTime)) continue;
                 Gizmos.color = Color.Lerp(Color.yellow, Color.red, r.threatLevel);
                 Gizmos.DrawWireSphere(r.position, r.confidence * 1.5f);
             }

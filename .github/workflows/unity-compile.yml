@@ -1,0 +1,47 @@
+name: Unity Compile Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Headless compile (6000.0.60f1)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Unity - activate license
+        uses: game-ci/unity-license-activate@v3
+        with:
+          unityVersion: 6000.0.60f1
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+
+      - name: Unity - compile scripts (batchmode)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          unityVersion: 6000.0.60f1
+          targetPlatform: StandaloneLinux64
+          projectPath: .
+          buildName: BeeSwarm
+          buildsPath: Builds
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeeSwarm-linux
+          path: Builds/**
+          if-no-files-found: error
