@@ -17,15 +17,6 @@ jobs:
         with:
           lfs: true
 
-      - name: Unity - activate license
-        uses: game-ci/unity-license-activate@v3
-        with:
-          unityVersion: 6000.0.60f1
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-
       - name: Unity - compile scripts (batchmode)
         uses: game-ci/unity-builder@v4
         env:
