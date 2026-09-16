@@ -51,16 +51,19 @@ jobs:
       - name: Download Unity editor and extract reference assemblies
         if: steps.unity-refs.outputs.cache-hit != 'true'
         run: |
-          set -eux
+          set -euxo pipefail
           mkdir -p /tmp/unityrefs
           curl -fSL --retry 3 -o /tmp/Unity.tar.xz \
             "https://download.unity3d.com/download_unity/${UNITY_REVISION}/LinuxEditorInstaller/Unity.tar.xz"
-          # Берём только managed-сборки движка, остальные 4 ГБ не распаковываем
-          tar -xJf /tmp/Unity.tar.xz -C /tmp/unityrefs \
-            --wildcards '*/Editor/Data/Managed/UnityEngine/*.dll' \
-            --wildcards '*/Editor/Data/Managed/UnityEngine.dll'
+          # Берём только managed-модули движка, остальные 4 ГБ не распаковываем.
+          # Пути в архиве начинаются с Editor/ (без ведущего каталога).
+          # Монолитный Editor/Data/Managed/UnityEngine.dll намеренно НЕ берём:
+          # он дублирует типы модулей → CS0433.
+          # xz -T0 — распаковка в несколько потоков, иначе шаг упирается в один ядерный поток.
+          xz -T0 -dc /tmp/Unity.tar.xz | tar -x -C /tmp/unityrefs \
+            --wildcards 'Editor/Data/Managed/UnityEngine/*.dll'
           find /tmp/unityrefs -mindepth 2 -name '*.dll' -exec mv -t /tmp/unityrefs {} +
-          find /tmp/unityrefs -mindepth 1 -type d -exec rm -rf {} +
+          rm -rf /tmp/unityrefs/Editor
           rm -f /tmp/Unity.tar.xz
           ls -1 /tmp/unityrefs/*.dll | wc -l
 
