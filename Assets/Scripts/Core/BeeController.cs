@@ -144,7 +144,9 @@ namespace BeeSwarm.Core
             if (useMemory && beeMemory != null && Random.value > exploreChance)
             {
                 var bestFlower = beeMemory.GetBestFlower(transform.position);
-                var hiveFlower = FindObjectOfType<HiveKnowledgeBase>()?.GetBestFlower(transform.position);
+                // Синглтон вместо FindObjectOfType: раньше поиск по всей сцене шёл
+                // у каждой пчелы на каждом выборе цели
+                var hiveFlower = HiveKnowledgeBase.Instance?.GetBestFlower(transform.position);
 
                 BeeMemory.FlowerMemory target = null;
                 if (bestFlower != null && hiveFlower != null)
@@ -176,7 +178,7 @@ namespace BeeSwarm.Core
         {
             Vector2 randomOffset = Random.insideUnitCircle * explorationRadius;
             Vector2 target = (Vector2)transform.position + randomOffset;
-            var hiveBase = FindObjectOfType<HiveKnowledgeBase>();
+            var hiveBase = HiveKnowledgeBase.Instance;
             if (hiveBase != null && hiveBase.IsPositionDangerous(target))
             {
                 for (int i = 0; i < 5; i++)

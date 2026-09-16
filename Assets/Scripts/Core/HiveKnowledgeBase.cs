@@ -21,6 +21,12 @@ namespace BeeSwarm.Core
         [SerializeField] private float mergeRadius = 3f;          // радиус слияния записей
         [SerializeField] private bool debugLog = false;
 
+        /// <summary>
+        /// Синглтон по образцу GameManager/SeasonCycle.
+        /// Живёт на объекте улья, поэтому дубликат снимаем с компонента, а не с GameObject.
+        /// </summary>
+        public static HiveKnowledgeBase Instance { get; private set; }
+
         // Общая память роя
         private List<HiveFlowerRecord> knownFlowers = new List<HiveFlowerRecord>();
         private List<HiveDangerRecord> knownDangers = new List<HiveDangerRecord>();
@@ -60,6 +66,17 @@ namespace BeeSwarm.Core
             public string dangerType;
 
             public bool IsFresh(float decayTime) => Time.time - lastReportedTime < decayTime;
+        }
+
+        void Awake()
+        {
+            if (Instance == null) Instance = this;
+            else if (Instance != this) Destroy(this);
+        }
+
+        void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         void Update()

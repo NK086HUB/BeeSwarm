@@ -76,7 +76,8 @@ namespace BeeSwarm.Core
 
         void Start()
         {
-            hiveKnowledge = FindObjectOfType<HiveKnowledgeBase>();
+            // Синглтон вместо FindObjectOfType — у каждой пчелы в Start()
+            hiveKnowledge = HiveKnowledgeBase.Instance;
         }
 
         void Update()
@@ -89,8 +90,11 @@ namespace BeeSwarm.Core
 
         /// <summary>
         /// Запомнить цветок. Обновляет существующую запись или создаёт новую.
+        /// initialConfidence/initialVisitCount нужны для "слухов" из улья:
+        /// они проходят через тот же лимит maxFlowerMemories, что и свои находки.
         /// </summary>
-        public void RememberFlower(Vector3 position, float nectarAmount)
+        public void RememberFlower(Vector3 position, float nectarAmount,
+            float initialConfidence = 0.7f, int initialVisitCount = 1)
         {
             // Ищем существующую запись рядом (радиус 2 единицы)
             FlowerMemory existing = flowerMemories
@@ -122,9 +126,9 @@ namespace BeeSwarm.Core
                 {
                     position = position,
                     nectarYield = nectarAmount,
-                    confidence = 0.7f, // начальная осторожная уверенность
+                    confidence = Mathf.Clamp(initialConfidence, 0f, 1f),
                     lastVisitedTime = Time.time,
-                    visitCount = 1
+                    visitCount = initialVisitCount
                 });
             }
         }
@@ -132,7 +136,8 @@ namespace BeeSwarm.Core
         /// <summary>
         /// Запомнить опасную зону
         /// </summary>
-        public void RememberDanger(Vector3 position, float threatLevel, string dangerType = "unknown")
+        public void RememberDanger(Vector3 position, float threatLevel, string dangerType = "unknown",
+            float initialConfidence = 0.8f)
         {
             DangerMemory existing = dangerMemories
                 .FirstOrDefault(m => Vector3.Distance(m.position, position) < 3f);
@@ -159,7 +164,7 @@ namespace BeeSwarm.Core
                 {
                     position = position,
                     threatLevel = threatLevel,
-                    confidence = 0.8f,
+                    confidence = Mathf.Clamp(initialConfidence, 0f, 1f),
                     lastEncounterTime = Time.time,
                     dangerType = dangerType
                 });
@@ -271,7 +276,10 @@ namespace BeeSwarm.Core
         }
 
         /// <summary>
-        /// Впитать знания улья — новые цветы и опасности
+        /// Впитать знания улья — новые цветы и опасности.
+        /// Записи идут через RememberFlower/RememberDanger, поэтому лимиты
+        /// maxFlowerMemories/maxDangerMemories соблюдаются и список
+        /// не разрастается до размеров базы улья (100+ записей).
         /// </summary>
         private void ApplyHiveKnowledge()
         {
@@ -286,14 +294,8 @@ namespace BeeSwarm.Core
 
                 if (!alreadyKnow)
                 {
-                    flowerMemories.Add(new FlowerMemory
-                    {
-                        position = hf.position,
-                        nectarYield = hf.nectarYield,
-                        confidence = hf.confidence * 0.5f, // слухи — половина уверенности
-                        lastVisitedTime = Time.time,
-                        visitCount = 0
-                    });
+                    // Слух — половина уверенности; вытеснение делает RememberFlower
+                    RememberFlower(hf.position, hf.nectarYield, hf.confidence * 0.5f, 0);
                 }
             }
 
@@ -306,14 +308,7 @@ namespace BeeSwarm.Core
 
                 if (!alreadyKnow)
                 {
-                    dangerMemories.Add(new DangerMemory
-                    {
-                        position = hd.position,
-                        threatLevel = hd.threatLevel,
-                        confidence = hd.confidence * 0.5f,
-                        lastEncounterTime = Time.time,
-                        dangerType = hd.dangerType
-                    });
+                    RememberDanger(hd.position, hd.threatLevel, hd.dangerType, hd.confidence * 0.5f);
                 }
             }
         }
