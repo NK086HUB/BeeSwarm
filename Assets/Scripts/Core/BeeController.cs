@@ -1,4 +1,5 @@
 using UnityEngine;
+using BeeSwarm.Gameplay;
 
 namespace BeeSwarm.Core
 {
@@ -18,12 +19,26 @@ namespace BeeSwarm.Core
         [SerializeField] private float shareInterval = 5f;
         [SerializeField] private float exploreChance = 0.3f;
 
+        [Header("Фуражировка")]
+        [SerializeField] private float carryCapacity = 12f;      // сколько нектара уносит за рейс
+        [SerializeField] private float harvestPerVisit = 6f;     // сколько берёт с цветка за подход
+        [SerializeField] private float harvestRadius = 1.5f;     // на каком расстоянии цветок считается «под пчелой»
+        [SerializeField] private float forageScanRadius = 25f;   // поиск следующего цветка, если зобик не полон
+        [SerializeField] private float noticeRadius = 5f;        // радиус, в котором разведчица замечает цветок
+        [SerializeField] private float emptyFlowerYield = 0.1f;  // оценка для вытоптанного места
+
+        [Header("Переработка нектара в улье")]
+        [SerializeField] private float honeyPerNectar = 0.4f;
+        [SerializeField] private float pollenPerNectar = 0.25f;
+        [SerializeField] private float waxPerNectar = 0.05f;
+
         [Header("Ссылки")]
         [SerializeField] private Rigidbody2D rb;
         [SerializeField] private SpriteRenderer spriteRenderer;
 
         // Текущие значения
         private float currentEnergy;
+        private float carriedNectar;
         private Vector2 targetPosition;
         private bool hasTarget = false;
         private BeeState state = BeeState.Idle;
@@ -45,6 +60,7 @@ namespace BeeSwarm.Core
         public float EnergyPercentage => currentEnergy / maxEnergy;
         public bool IsExhausted => currentEnergy < 20f;
         public BeeState State => state;
+        public float CarriedNectar => carriedNectar;
         public Vector2 CurrentPosition => transform.position;
         public BeeMemory Memory => beeMemory;
 
@@ -76,17 +92,36 @@ namespace BeeSwarm.Core
             UpdateState();
             UpdateRotation();
 
-            // Обмен знаниями в улье
-            if (state == BeeState.Returning && IsInsideHive() && useMemory && beeMemory != null)
+            // Возвращение домой: сдаём нектар, когда пчела оказалась в улье
+            if (state == BeeState.Returning)
             {
-                if (Time.time - lastShareTime > shareInterval)
+                if (IsInsideHive())
                 {
-                    beeMemory.ShareWithHive();
-                    lastShareTime = Time.time;
-                    if (state == BeeState.Returning)
+                    DepositNectar();
+
+                    if (useMemory && beeMemory != null && Time.time - lastShareTime > shareInterval)
                     {
+                        beeMemory.ShareWithHive();
+                        lastShareTime = Time.time;
+                    }
+
+                    state = BeeState.Idle;
+                    hasTarget = false;
+                }
+                else if (!hasTarget)
+                {
+                    // Дошли до входа, но он оказался вне границ улья — идём к центру,
+                    // иначе пчела зависнет с нектаром и не сдаст его никогда
+                    var hive = HiveManager.Instance;
+                    if (hive != null)
+                    {
+                        targetPosition = hive.HiveCenter;
+                        hasTarget = true;
+                    }
+                    else
+                    {
+                        carriedNectar = 0f;
                         state = BeeState.Idle;
-                        hasTarget = false;
                     }
                 }
             }
@@ -231,7 +266,24 @@ namespace BeeSwarm.Core
             if (distance < 0.5f)
             {
                 hasTarget = false;
-                if (state == BeeState.Foraging) OnReachTarget();
+
+                // Обработчики сами решают, каким будет следующее состояние
+                // (раньше строка state = Idle затирала Returning и пчела не шла домой)
+                if (state == BeeState.Foraging)
+                {
+                    OnReachTarget();
+                    return;
+                }
+
+                if (state == BeeState.Exploring)
+                {
+                    if (TrySpotFlower()) return;
+                    state = BeeState.Idle;
+                    return;
+                }
+
+                if (state == BeeState.Returning) return; // Update сдаст нектар в улье
+
                 state = BeeState.Idle;
                 return;
             }
@@ -247,13 +299,96 @@ namespace BeeSwarm.Core
             rb.rotation = Mathf.LerpAngle(rb.rotation, targetAngle, rotationSpeed * Time.deltaTime / 360f);
         }
 
+        /// <summary>
+        /// Пчела дошла до цели. Раньше здесь начислялся Random.Range(1,10) —
+        /// память роя училась на шуме, цветы не истощались, а мёд в улье не менялся.
+        /// Теперь нектар берётся у реального цветка.
+        /// </summary>
         private void OnReachTarget()
         {
-            float randomNectar = Random.Range(1f, 10f);
+            var spawner = FlowerSpawner.Instance;
+            Flower flower = spawner != null ? spawner.FindNearestFlower(targetPosition, harvestRadius) : null;
+
+            if (flower == null)
+            {
+                // Цветок из памяти уже объеден: помечаем место как малополезное
+                if (useMemory && beeMemory != null)
+                    beeMemory.RememberFlower(targetPosition, emptyFlowerYield);
+                currentEnergy = Mathf.Min(currentEnergy + 2f, maxEnergy);
+                ReturnToHive();
+                return;
+            }
+
+            float room = carryCapacity - carriedNectar;
+            float gathered = flower.Collect(Mathf.Min(harvestPerVisit, room));
+
+            if (gathered <= 0f)
+            {
+                if (useMemory && beeMemory != null)
+                    beeMemory.RememberFlower(flower.Position, emptyFlowerYield);
+                ReturnToHive();
+                return;
+            }
+
+            carriedNectar += gathered;
             if (useMemory && beeMemory != null)
-                beeMemory.RememberFlower(targetPosition, randomNectar);
-            currentEnergy = Mathf.Min(currentEnergy + 5f, maxEnergy);
+                beeMemory.RememberFlower(flower.Position, gathered);
+
+            currentEnergy = Mathf.Min(currentEnergy + 3f, maxEnergy);
+
+            // Ещё есть место — летим к следующему цветку, иначе домой
+            if (TryContinueForaging()) return;
+
             ReturnToHive();
+        }
+
+        /// <summary>
+        /// Разведчица дошла до случайной точки и заметила цветок рядом —
+        /// летим к нему (иначе пчёлы вообще никогда не находили цветы,
+        /// пока память роя пуста).
+        /// </summary>
+        private bool TrySpotFlower()
+        {
+            var spawner = FlowerSpawner.Instance;
+            if (spawner == null) return false;
+
+            Flower flower = spawner.FindNearestFlower(transform.position, noticeRadius);
+            if (flower == null) return false;
+
+            SetForageTarget(flower.Position);
+            return true;
+        }
+
+        /// <summary>Ищем следующий цветок поблизости, если зобик ещё не полон.</summary>
+        private bool TryContinueForaging()
+        {
+            if (carriedNectar >= carryCapacity - 0.5f || IsExhausted) return false;
+
+            var spawner = FlowerSpawner.Instance;
+            if (spawner == null) return false;
+
+            Flower next = spawner.FindNearestFlower(transform.position, forageScanRadius);
+            if (next == null) return false;
+
+            SetForageTarget(next.Position);
+            return true;
+        }
+
+        /// <summary>Сдать принесённый нектар в улей. HiveManager — владелец складских запасов.</summary>
+        private void DepositNectar()
+        {
+            if (carriedNectar <= 0f) return;
+
+            float nectar = carriedNectar;
+            carriedNectar = 0f;
+
+            if (HiveManager.Instance != null)
+            {
+                HiveManager.Instance.AddResources(
+                    nectar * honeyPerNectar,
+                    nectar * pollenPerNectar,
+                    nectar * waxPerNectar);
+            }
         }
 
         // ======================== УЛЕЙ ========================
