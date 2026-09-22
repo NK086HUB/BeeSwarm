@@ -14,6 +14,7 @@ namespace BeeSwarm.Gameplay
         [SerializeField] private float seasonDuration = 120f;
 
         [Header("Температура")]
+        // Кривая температур — ОТКЛОНЕНИЕ от baseTemperature, не абсолютная температура.
         [SerializeField] private float baseTemperature = 20f;
         [SerializeField] private AnimationCurve temperatureCurve;
 
@@ -50,12 +51,15 @@ namespace BeeSwarm.Gameplay
 
             if (temperatureCurve == null || temperatureCurve.keys.Length < 2)
             {
+                // Значения — отклонения от baseTemperature (раньше в ключах лежали
+                // абсолютные температуры, они складывались с базой: зимой выходило
+                // +15°C, то есть мороза в игре не было вообще).
                 temperatureCurve = new AnimationCurve(
-                    new Keyframe(0f, 15f),    // Весна
-                    new Keyframe(0.25f, 25f),  // Лето (пик)
-                    new Keyframe(0.5f, 10f),   // Осень
-                    new Keyframe(0.75f, -5f),  // Зима
-                    new Keyframe(1f, 15f)      // След. весна
+                    new Keyframe(0f, -5f),     // Весна: 20-5  = 15°C
+                    new Keyframe(0.25f, 5f),   // Лето:  20+5  = 25°C (пик)
+                    new Keyframe(0.5f, -10f),  // Осень: 20-10 = 10°C
+                    new Keyframe(0.75f, -25f), // Зима:  20-25 = -5°C
+                    new Keyframe(1f, -5f)      // След. весна
                 );
             }
 
@@ -103,8 +107,13 @@ namespace BeeSwarm.Gameplay
             }
         }
 
-        /// <summary>Пчёлы уходят в улей зимой?</summary>
-        public bool IsWinterHibernation => currentSeason == Season.Winter && Temperature < 0f;
+        /// <summary>
+        /// Зимняя спячка роя — источник истины для пчёл, цветов и улья.
+        /// Здесь намеренно только сезон: раньше стояло ещё и «Temperature &lt; 0f»,
+        /// но из-за абсолютных значений в кривой температур зима была тёплой и
+        /// условие не выполнялось никогда, то есть механика была мёртвым кодом.
+        /// </summary>
+        public bool IsWinterHibernation => currentSeason == Season.Winter;
 
         void OnGUI()
         {

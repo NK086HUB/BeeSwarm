@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BeeSwarm.Gameplay;
 
 namespace BeeSwarm.Core
 {
@@ -18,6 +19,11 @@ namespace BeeSwarm.Core
         [SerializeField] private float pollenAmount = 50f;
         [SerializeField] private float waxAmount = 30f;
         
+        [Header("Зимняя спячка")]
+        [SerializeField] private float winterHeatingPerSecond = 0.5f;   // мёд на обогрев улья
+        [SerializeField] private bool winterStarvation = true;           // гибнут ли пчёлы без мёда
+        [SerializeField] private float starvationInterval = 10f;         // как часто теряем пчелу без мёда
+
         [Header("Ссылки")]
         [SerializeField] private GameObject beePrefab;
         [SerializeField] private Transform beeSpawnPoint;
@@ -25,6 +31,10 @@ namespace BeeSwarm.Core
         // Коллекции
         private List<BeeController> allBees = new List<BeeController>();
         private Queue<BeeController> beePool = new Queue<BeeController>();
+
+        private float starvationTimer;
+        private float winterHoneySpent;
+        private int winterLosses;
         
         // Свойства
         public int BeeCount => allBees.Count;
@@ -34,6 +44,22 @@ namespace BeeSwarm.Core
         public float WaxAmount => waxAmount;
         public Vector3 HiveCenter => transform.position;
         public Transform HiveEntrance => hiveEntrance;
+
+        /// <summary>Сколько мёда съела текущая зима (обогрев).</summary>
+        public float WinterHoneySpent => winterHoneySpent;
+
+        /// <summary>Сколько пчёл рой потерял зимой из-за нехватки мёда.</summary>
+        public int WinterLosses => winterLosses;
+
+        /// <summary>Идёт ли зимняя спячка — источник истины SeasonCycle.</summary>
+        private bool IsWinter
+        {
+            get
+            {
+                var season = SeasonCycle.Instance;
+                return season != null && season.IsWinterHibernation;
+            }
+        }
         
         // Синглтон
         public static HiveManager Instance { get; private set; }
@@ -54,6 +80,47 @@ namespace BeeSwarm.Core
         {
             InitializeBeePool();
             SpawnInitialBees(10); // Начальные 10 пчёл
+        }
+
+        /// <summary>
+        /// Зима стоит мёда: улей жгут на обогрев. Без этого запасы копить незачем,
+        /// а зимняя спячка была бы просто паузой. Когда мёд кончился — обогревать
+        /// нечем, и рой начинает терять пчёл.
+        /// </summary>
+        void Update()
+        {
+            if (!IsWinter)
+            {
+                starvationTimer = 0f;
+                return;
+            }
+
+            float wanted = winterHeatingPerSecond * Time.deltaTime;
+            float spent = Mathf.Min(honeyAmount, wanted);
+            honeyAmount -= spent;
+            winterHoneySpent += spent;
+
+            if (honeyAmount > 0f || !winterStarvation)
+            {
+                starvationTimer = 0f;
+                return;
+            }
+
+            starvationTimer += Time.deltaTime;
+            if (starvationTimer < starvationInterval) return;
+            starvationTimer = 0f;
+            LoseBeeToWinter();
+        }
+
+        /// <summary>Пчела не пережила зиму: возвращается в пул (рой восполнит весной).</summary>
+        private void LoseBeeToWinter()
+        {
+            var bees = GetAllActiveBees();
+            if (bees.Count == 0) return;
+
+            winterLosses++;
+            ReturnBee(bees[bees.Count - 1]);
+            Debug.LogWarning($"❄️ Зимняя потеря: мёд кончился, рой без обогрева (потерь всего: {winterLosses})");
         }
         
         /// <summary>
@@ -298,11 +365,14 @@ namespace BeeSwarm.Core
         void OnGUI()
         {
             // Простой UI для отладки
-            GUILayout.BeginArea(new Rect(10, 10, 300, 200));
+            GUILayout.BeginArea(new Rect(10, 10, 300, 240));
             GUILayout.Label($"ПЧЁЛЫ: {ActiveBeeCount}/{maxBees}");
             GUILayout.Label($"МЁД: {honeyAmount:F1}");
             GUILayout.Label($"ПЫЛЬЦА: {pollenAmount:F1}");
             GUILayout.Label($"ВОСК: {waxAmount:F1}");
+
+            if (IsWinter)
+                GUILayout.Label($"❄️ ЗИМА: обогрев -{winterHeatingPerSecond:F1} мёд/с | съедено {winterHoneySpent:F1} | потерь {winterLosses}");
             
             if (GUILayout.Button("Добавить пчелу"))
             {

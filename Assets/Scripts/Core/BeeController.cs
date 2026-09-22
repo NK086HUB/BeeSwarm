@@ -44,6 +44,7 @@ namespace BeeSwarm.Core
         private BeeState state = BeeState.Idle;
 
         private BeeMemory beeMemory;
+        private SeasonCycle seasonCycle;
         private float lastShareTime;
 
         public enum BeeState
@@ -63,6 +64,13 @@ namespace BeeSwarm.Core
         public float CarriedNectar => carriedNectar;
         public Vector2 CurrentPosition => transform.position;
         public BeeMemory Memory => beeMemory;
+        public bool IsHibernating => IsHibernationActive;
+
+        /// <summary>SeasonCycle может появиться позже пчелы, поэтому берём синглтон лениво.</summary>
+        private SeasonCycle Season => seasonCycle != null ? seasonCycle : (seasonCycle = SeasonCycle.Instance);
+
+        /// <summary>Идёт ли зимняя спячка: рой сидит в улье, цель не выбирается.</summary>
+        private bool IsHibernationActive { get { var s = Season; return s != null && s.IsWinterHibernation; } }
 
         void Awake()
         {
@@ -77,6 +85,34 @@ namespace BeeSwarm.Core
             targetPosition = transform.position;
             state = BeeState.Exploring;
             LockZ();
+
+            seasonCycle = SeasonCycle.Instance;
+            if (seasonCycle != null) seasonCycle.OnSeasonChanged += OnSeasonChanged;
+        }
+
+        void OnDestroy()
+        {
+            if (seasonCycle != null) seasonCycle.OnSeasonChanged -= OnSeasonChanged;
+        }
+
+        /// <summary>
+        /// Первая же секунда зимы: рой бросает работу и идёт домой, не дотягивая цель.
+        /// Без этого пчёлы возвращались бы в улей только когда сами дойдут до цветка.
+        /// </summary>
+        private void OnSeasonChanged(SeasonCycle.Season season)
+        {
+            if (season != SeasonCycle.Season.Winter) return;
+
+            if (IsInsideHive())
+            {
+                DepositNectar();
+                hasTarget = false;
+                state = BeeState.Idle;
+            }
+            else
+            {
+                ReturnToHive();
+            }
         }
 
         void Update()
@@ -144,6 +180,9 @@ namespace BeeSwarm.Core
 
         private void UpdateState()
         {
+            // Зима перехватывает управление целиком: никакой фуражировки, пока не потеплеет.
+            if (IsHibernationActive) { UpdateHibernation(); return; }
+
             switch (state)
             {
                 case BeeState.Idle:
@@ -193,6 +232,25 @@ namespace BeeSwarm.Core
             }
 
             SetExplorationTarget();
+        }
+
+        /// <summary>
+        /// Зимняя спячка: нектар сдаётся, цель сбрасывается, силы копятся в улье.
+        /// Вне улья пчела дотягивает только дорогу домой — уже начатый рейс не бросается,
+        /// но новых целей не берёт.
+        /// </summary>
+        private void UpdateHibernation()
+        {
+            if (!IsInsideHive())
+            {
+                if (state != BeeState.Returning) ReturnToHive();
+                return;
+            }
+
+            hasTarget = false;
+            DepositNectar();
+            RestInHive();
+            state = BeeState.Idle;
         }
 
         private BeeMemory.FlowerMemory ConvertHiveToMemory(HiveKnowledgeBase.HiveFlowerRecord hiveRecord)
@@ -413,7 +471,7 @@ namespace BeeSwarm.Core
 
         public void RestoreEnergy(float amount) { currentEnergy += amount; currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy); }
         public void ConsumeEnergy(float amount) { currentEnergy -= amount; currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy); }
-        public bool CanWork() => !IsExhausted && currentEnergy > 30f;
+        public bool CanWork() => !IsExhausted && currentEnergy > 30f && !IsHibernationActive;
 
         // ======================== ВИЗУАЛИЗАЦИЯ ========================
 

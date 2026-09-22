@@ -118,9 +118,11 @@ namespace BeeSwarm.Gameplay
         void OnGUI()
         {
             if (hiveManager == null) return;
-            GUILayout.BeginArea(new Rect(Screen.width / 2 - 100, Screen.height - 60, 200, 50));
+            GUILayout.BeginArea(new Rect(Screen.width / 2 - 100, Screen.height - 80, 260, 70));
             GUILayout.Label($"🏠 Улей | Пчёл: {hiveManager.ActiveBeeCount}/{hiveManager.BeeCount}");
             GUILayout.Label($"🍯 {hiveManager.HoneyAmount:F0} | 🌾 {hiveManager.PollenAmount:F0} | 🕯 {hiveManager.WaxAmount:F0}");
+            if (seasonCycle != null && seasonCycle.IsWinterHibernation)
+                GUILayout.Label("❄️ Спячка: рой в улье, мёд уходит на обогрев");
             GUILayout.EndArea();
         }
     }

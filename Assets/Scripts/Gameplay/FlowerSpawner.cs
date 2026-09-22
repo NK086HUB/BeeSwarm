@@ -76,6 +76,10 @@ namespace BeeSwarm.Gameplay
 
         void Update()
         {
+            // Зима: поляна спит. Не только не сажаем — таймер респавна не копим,
+            // иначе первое же обновление после весны высыпало бы на поляну пачку цветов.
+            if (IsHibernation) return;
+
             respawnTimer += Time.deltaTime;
             if (respawnTimer < respawnDelay) return;
             respawnTimer = 0f;
@@ -92,6 +96,16 @@ namespace BeeSwarm.Gameplay
         {
             float multiplier = seasonCycle != null ? seasonCycle.GrowthMultiplier : 1f;
             return baseFlowerCount * multiplier;
+        }
+
+        /// <summary>Зимняя спячка: сажать цветы нельзя (см. SeasonCycle.IsWinterHibernation).</summary>
+        private bool IsHibernation
+        {
+            get
+            {
+                if (seasonCycle == null) seasonCycle = SeasonCycle.Instance;
+                return seasonCycle != null && seasonCycle.IsWinterHibernation;
+            }
         }
 
         void SpawnInitialFlowers()
@@ -230,6 +244,12 @@ namespace BeeSwarm.Gameplay
         void Update()
         {
             if (!isDepleted) return;
+
+            // Зимой цветы не отрастают: иначе к первой секунде весны поляна была бы
+            // уже полной и весна ничем не отличалась бы от лета.
+            var season = SeasonCycle.Instance;
+            if (season != null && season.IsWinterHibernation) return;
+
             regrowTimer += Time.deltaTime;
             if (regrowTimer >= regrowTime) Regrow();
         }
