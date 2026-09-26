@@ -24,6 +24,10 @@ namespace BeeSwarm.Core
         [SerializeField] private bool winterStarvation = true;           // гибнут ли пчёлы без мёда
         [SerializeField] private float starvationInterval = 10f;         // как часто теряем пчелу без мёда
 
+        [Header("Расплод")]
+        [SerializeField] private float broodInterval = 15f;              // как часто рой выводит пчелу (не зимой)
+        [SerializeField] private float broodCost = 10f;                  // мёд за одну выведенную пчелу
+
         [Header("Ссылки")]
         [SerializeField] private GameObject beePrefab;
         [SerializeField] private Transform beeSpawnPoint;
@@ -33,12 +37,15 @@ namespace BeeSwarm.Core
         private Queue<BeeController> beePool = new Queue<BeeController>();
 
         private float starvationTimer;
+        private float broodTimer;
         private float winterHoneySpent;
         private int winterLosses;
         
         // Свойства
         public int BeeCount => allBees.Count;
-        public int ActiveBeeCount => allBees.Count - beePool.Count;
+        // allBees хранит только активных пчёл (ReturnBee убирает пчелу из списка),
+        // поэтому вычитать пул второй раз нельзя — иначе счётчик занижался.
+        public int ActiveBeeCount => allBees.Count;
         public float HoneyAmount => honeyAmount;
         public float PollenAmount => pollenAmount;
         public float WaxAmount => waxAmount;
@@ -80,6 +87,55 @@ namespace BeeSwarm.Core
         {
             InitializeBeePool();
             SpawnInitialBees(10); // Начальные 10 пчёл
+
+            var season = SeasonCycle.Instance;
+            if (season != null) season.OnSeasonChanged += OnSeasonChanged;
+        }
+
+        void OnDestroy()
+        {
+            var season = SeasonCycle.Instance;
+            if (season != null) season.OnSeasonChanged -= OnSeasonChanged;
+        }
+
+        /// <summary>
+        /// Смена сезона для улья: весной рой выходит из спячки и начинает расплод.
+        /// Без этого зимние потери были необратимыми — LoseBeeToWinter() возвращал пчёл
+        /// в пул «до весны», а весеннего пробуждения не существовало: рой умел только
+        /// уменьшаться и к 2-3-й зиме вымирал.
+        /// </summary>
+        private void OnSeasonChanged(SeasonCycle.Season season)
+        {
+            broodTimer = 0f;
+
+            if (season != SeasonCycle.Season.Spring) return;
+
+            int toWake = beePool.Count;
+            for (int i = 0; i < toWake && SpawnBee() != null; i++) { }
+            winterLosses = 0;
+            Debug.Log($"🌱 Весеннее пробуждение: активных {ActiveBeeCount}");
+        }
+
+        /// <summary>
+        /// Расплод: не зимой рой выводит пчёл, пока хватает мёда. Это противовес
+        /// зимнему расходу — колония растёт, а не только тратит запасы.
+        /// </summary>
+        private void UpdateBrood()
+        {
+            if (honeyAmount < broodCost)
+            {
+                broodTimer = 0f;
+                return;
+            }
+
+            broodTimer += Time.deltaTime;
+            if (broodTimer < broodInterval) return;
+
+            broodTimer = 0f;
+            if (SpawnBee() == null) return; // лимит улья — мёд не тратим
+
+            honeyAmount -= broodCost;
+            Debug.Log($"🍼 Расплод: +1 пчела (мёд {honeyAmount:F1}, активных {ActiveBeeCount})");
         }
 
         /// <summary>
@@ -92,6 +148,7 @@ namespace BeeSwarm.Core
             if (!IsWinter)
             {
                 starvationTimer = 0f;
+                UpdateBrood();
                 return;
             }
 
@@ -168,7 +225,9 @@ namespace BeeSwarm.Core
             BeeController bee;
             if (beePool.Count == 0)
             {
-                if (allBees.Count >= maxBees)
+                // Лимит считаем по всей колонии: ReturnBee() переносит пчелу из allBees
+                // в пул, поэтому проверка только по allBees позволяла обойти maxBees.
+                if (allBees.Count + beePool.Count >= maxBees)
                 {
                     Debug.LogWarning("Достигнут лимит пчёл!");
                     return null;
