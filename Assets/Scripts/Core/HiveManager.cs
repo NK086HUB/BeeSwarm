@@ -20,13 +20,17 @@ namespace BeeSwarm.Core
         [SerializeField] private float waxAmount = 30f;
         
         [Header("Зимняя спячка")]
-        [SerializeField] private float winterHeatingPerSecond = 0.5f;   // мёд на обогрев улья
+        [SerializeField] private float winterHeatingPerSecond = 0.5f;   // мёд на обогрев при полном улье (база)
         [SerializeField] private bool winterStarvation = true;           // гибнут ли пчёлы без мёда
         [SerializeField] private float starvationInterval = 10f;         // как часто теряем пчелу без мёда
+        [SerializeField] private int winterSeedBees = 2;                 // неприкосновенный запас пчёл на весну
 
         [Header("Расплод")]
         [SerializeField] private float broodInterval = 15f;              // как часто рой выводит пчелу (не зимой)
         [SerializeField] private float broodCost = 10f;                  // мёд за одну выведенную пчелу
+        [SerializeField] private float honeyCapacity = 100f;             // «полный» запас мёда для порогов
+        [SerializeField] private float broodBlockHoneyRatio = 0.15f;     // расплод стоп, если мёд ниже 15% запаса
+        [SerializeField] private float broodBlockAutumnProgress = 0.5f;  // со второй половины осени клапан активен
 
         [Header("Ссылки")]
         [SerializeField] private GameObject beePrefab;
@@ -38,6 +42,8 @@ namespace BeeSwarm.Core
 
         private float starvationTimer;
         private float broodTimer;
+        private float winterLogTimer;
+        private readonly float winterLogInterval = 10f;
         private float winterHoneySpent;
         private int winterLosses;
         
@@ -57,6 +63,37 @@ namespace BeeSwarm.Core
 
         /// <summary>Сколько пчёл рой потерял зимой из-за нехватки мёда.</summary>
         public int WinterLosses => winterLosses;
+
+        /// <summary>
+        /// Текущая цена обогрева, мёд/сек. Растёт линейно с заполненностью улья:
+        /// от половины базы (маленький рой) до полной (полный улей). Раньше цена была
+        /// плоской — рой из 5 пчёл и забитый улей жгли мёд одинаково, то есть размер
+        /// колонии не стоил ничего.
+        /// </summary>
+        public float HeatingCostPerSecond
+        {
+            get
+            {
+                float fill = maxBees > 0 ? Mathf.Clamp01((float)ActiveBeeCount / maxBees) : 1f;
+                return winterHeatingPerSecond * (0.5f + 0.5f * fill);
+            }
+        }
+
+        /// <summary>
+        /// Клапан расплода: конец осени при низком запасе мёда. Не даёт рою
+        /// перевести последний мёд в пчёл прямо перед зимой.
+        /// </summary>
+        public bool IsBroodBlocked
+        {
+            get
+            {
+                var season = SeasonCycle.Instance;
+                if (season == null) return false;
+                if (season.CurrentSeason != SeasonCycle.Season.Autumn) return false;
+                if (season.SeasonProgress < broodBlockAutumnProgress) return false;
+                return honeyAmount < honeyCapacity * broodBlockHoneyRatio;
+            }
+        }
 
         /// <summary>Идёт ли зимняя спячка — источник истины SeasonCycle.</summary>
         private bool IsWinter
@@ -122,6 +159,12 @@ namespace BeeSwarm.Core
         /// </summary>
         private void UpdateBrood()
         {
+            if (IsBroodBlocked)
+            {
+                broodTimer = 0f;
+                return;
+            }
+
             if (honeyAmount < broodCost)
             {
                 broodTimer = 0f;
@@ -152,10 +195,18 @@ namespace BeeSwarm.Core
                 return;
             }
 
-            float wanted = winterHeatingPerSecond * Time.deltaTime;
+            float wanted = HeatingCostPerSecond * Time.deltaTime;
             float spent = Mathf.Min(honeyAmount, wanted);
             honeyAmount -= spent;
             winterHoneySpent += spent;
+
+            // Лог зимовки: видно, с какой скоростью тает мёд и что происходит с роем.
+            winterLogTimer += Time.deltaTime;
+            if (winterLogTimer >= winterLogInterval)
+            {
+                winterLogTimer = 0f;
+                Debug.Log($"❄️ Зима: мёд {honeyAmount:F1} ({HeatingCostPerSecond:F3}/с), пчёл {ActiveBeeCount}/{maxBees}, потерь {winterLosses}");
+            }
 
             if (honeyAmount > 0f || !winterStarvation)
             {
@@ -173,7 +224,13 @@ namespace BeeSwarm.Core
         private void LoseBeeToWinter()
         {
             var bees = GetAllActiveBees();
-            if (bees.Count == 0) return;
+            if (bees.Count <= winterSeedBees)
+            {
+                // Семя на весну: не выедаем рой до нуля, иначе смерть необратима.
+                winterLogTimer = 0f;
+                Debug.LogWarning($"❄️ Мёд кончился, но рой держится на семени: {bees.Count} пчёл остаются в улье до весны");
+                return;
+            }
 
             winterLosses++;
             ReturnBee(bees[bees.Count - 1]);
